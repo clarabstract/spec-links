@@ -1,0 +1,41 @@
+# Declarations the framework merges into every schema. An app schema
+# never repeats them. Copied into each service's spec/ as
+# framework.graphql so the schema parses on its own.
+
+scalar Date
+scalar DateTime
+scalar Decimal
+scalar Cursor
+
+interface Error {
+  message: String!
+}
+
+"""The record the operation addresses doesn't exist."""
+type NotFound implements Error {
+  message: String!
+}
+
+enum Effect {
+  """Writes or changes records."""
+  WRITE
+  """Deletes a record or moves it into a final state."""
+  DESTRUCTIVE
+}
+
+directive @effect(kind: Effect!, idempotent: Boolean! = false) on FIELD_DEFINITION
+directive @calls(provider: String!, sends: [String!]!) on FIELD_DEFINITION
+directive @allow(roles: [Role!]!) on FIELD_DEFINITION
+directive @spec(
+  path: String
+  creates: [String!]
+  performs: [String!]
+  changes: [String!]
+  removes: [String!]
+  enforces: [String!]
+  requires: [String!]
+  applies: [String!]
+  serves: [String!]
+) on SCHEMA | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | ENUM | SCALAR | INPUT_OBJECT | INPUT_FIELD_DEFINITION
+directive @emits(events: [String!]!) on FIELD_DEFINITION
+directive @tags(names: [String!]!) on FIELD_DEFINITION

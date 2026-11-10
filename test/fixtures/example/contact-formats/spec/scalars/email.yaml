@@ -1,0 +1,12 @@
+format: https://github.com/clarabstract/spec-service/blob/v0.2/references/entity-spec-format.md
+scalar: email
+base: short-text
+description: >
+  An email address a message can be sent to.
+rules:
+  one-at-sign:
+    rule: >
+      An address is a mailbox name, one at sign and a domain with at
+      least one dot.
+    holds: facilities@example.com
+    breaks: facilities.example.com

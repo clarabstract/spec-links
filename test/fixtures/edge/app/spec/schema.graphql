@@ -1,0 +1,18 @@
+type Query {
+  orders(first: Int, after: String): [Order!]!
+}
+
+enum Status {
+  OPEN
+  PAID
+}
+
+type Order @spec(path: "entities.order") {
+  id: ID!
+  status: Status! @spec(path: "entities.order.rules.paid-once")
+}
+
+extend type Query {
+  invoices(order: ID!): [Order!]!
+    @spec(enforces: ["entities.order.rules.has-lines", "plans:solution-spec.components.api"])
+}

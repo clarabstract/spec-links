@@ -1,0 +1,9 @@
+parts:
+  first:
+    checks:
+      - checks.speed.fast
+    owner: parts.second
+  second:
+    checks:
+      - notes.missing
+    notes: text

@@ -1,0 +1,56 @@
+format: https://github.com/clarabstract/spec-service/blob/v0.2/references/entity-spec-format.md
+entity: room
+description: >
+  A meeting room in the office that staff can book. Facilities keep
+  the list: they add a room when it opens and remove it when it goes
+  out of use.
+identity:
+  same-when: >
+    Two rooms are the same when they have the same
+    {properties.code}: there is one room 3.14, whatever it is
+    called.
+  referred-to-as: >
+    By code, or by code and name: "3.14", "3.14 Harbour".
+  serves: [room-booking:requirements.rooms.unique-code]
+properties:
+  code:
+    type: scalars.room-code
+    required: true
+    changeable: false
+  name:
+    type: short-text
+    required: true
+  kind:
+    type: one-of
+    values: [meeting, focus, boardroom]
+    required: true
+  capacity:
+    type: whole-number
+    limits:
+      range: 1 to 500
+  contact:
+    meaning: who to ask about the room
+    type: contact-formats:scalars.email
+boundary:
+  owns: [entities.booking]
+  on-delete: Its bookings are deleted with it.
+rules:
+  no-open-bookings-when-removed:
+    rule: >
+      A room is removed only while no {entities.booking} of it is
+      held or confirmed with a {entities.booking.properties.start}
+      still ahead.
+    scope: entities
+    holds: a room whose bookings have all started or been cancelled
+    breaks: a room with a hold for tomorrow
+    serves: [room-booking:requirements.rooms.manage]
+definitions:
+  free:
+    kind: condition
+    definition: >
+      No held or confirmed {entities.booking} of the room overlaps
+      the interval asked about.
+    examples: >
+      Booked 10:00 to 11:00: free for 11:00 to 12:00, not free for
+      10:30 to 11:30.
+    serves: [room-booking:requirements.view.free-rooms]

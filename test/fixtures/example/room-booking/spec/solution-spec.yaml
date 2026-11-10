@@ -1,0 +1,93 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/clarabstract/solution-planner/v0.3/references/solution-spec.schema.json
+format: https://github.com/clarabstract/solution-planner/blob/v0.3/references/solution-spec-format.md
+solution: room-booking
+
+problem: >
+  Staff at a small office book meeting rooms on a whiteboard by the
+  door. Rooms get double-booked, nobody knows which are free, and the
+  list of rooms is out of date. Success means staff hold and confirm
+  a room from chat without clashes, and facilities keep the room list
+  current.
+budget: Half a day of review
+stakes: >
+  A double booking costs a meeting its room; nothing is lost that
+  can't be booked again
+
+components:
+  room-booking-service:
+    kind: service
+    action: build
+    purpose: Keeps bookings of the office's meeting rooms
+    owns:
+      - rooms
+      - bookings
+      - no double booking
+      - booking statuses
+      - which callers may manage rooms
+    does-not:
+      - send invitations
+      - decide who may use a room
+      - charge for rooms
+    requirements:
+      - requirements.rooms.unique-code
+      - requirements.rooms.code-format
+      - requirements.rooms.manage
+      - requirements.book.no-overlap
+      - requirements.book.valid-slot
+      - requirements.book.confirm
+      - requirements.cancel.until-start
+      - requirements.view.day-plan
+      - requirements.view.free-rooms
+      - requirements.access.two-roles
+      - requirements.integrations.hold-then-plan
+    why-separate: >
+      Holds the bookings both clients share, so it runs on its own
+      and each client calls it
+  booking-skill:
+    kind: skill
+    action: build
+    purpose: Books a room from a request in chat
+    owns: [turning a request into a room and a slot]
+    does-not: [keep bookings, manage rooms]
+    requirements:
+      - requirements.integrations.hold-then-plan
+    why-separate: >
+      Judgement logic: reading a request takes a model, and it
+      changes separately from the bookings
+  facilities-ui:
+    kind: ui
+    action: build
+    purpose: Lets facilities staff keep the room list
+    owns: [the screens for adding and removing rooms]
+    does-not: [book rooms, store rooms]
+    requirements:
+      - requirements.rooms.manage
+    why-separate: >
+      People use it directly, and facilities don't work in chat
+
+connections:
+  skill-books-rooms:
+    from: components.booking-skill
+    to: components.room-booking-service
+    uses:
+      - find a free room
+      - hold a room
+      - confirm a hold
+      - cancel a booking
+      - list a day's bookings
+    contract-owner: components.room-booking-service
+  facilities-manages-rooms:
+    from: components.facilities-ui
+    to: components.room-booking-service
+    uses: [add a room, remove a room]
+    contract-owner: components.room-booking-service
+
+constraints:
+  two-credentials:
+    statement: >
+      Staff and facilities reach the service with different
+      credentials
+
+no-gos:
+  recurring-bookings:
+    statement: Booking a room on a repeating schedule

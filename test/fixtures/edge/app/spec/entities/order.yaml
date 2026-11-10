@@ -1,0 +1,7 @@
+entity: order
+properties:
+  total:
+    type: decimal
+rules:
+  paid-once:
+    rule: An order is paid at most once.

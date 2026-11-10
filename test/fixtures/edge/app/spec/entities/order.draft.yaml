@@ -1,0 +1,11 @@
+entity: order
+properties:
+  total:
+    type: decimal
+  note:
+    type: long-text
+rules:
+  paid-once:
+    rule: An order is paid at most once, whatever its {properties.total}.
+  has-lines:
+    rule: An order has at least one line.

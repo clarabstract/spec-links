@@ -1,0 +1,270 @@
+# format: https://github.com/clarabstract/spec-service/blob/v0.2/references/operation-spec-format.md
+
+"""
+Keeps bookings of the office's meeting rooms. It does not send
+invitations, decide who may use a room or charge for rooms.
+"""
+schema @spec(serves: ["room-booking:requirements.access.two-roles"]) {
+  query: Query
+  mutation: Mutation
+}
+
+enum Role {
+  """Any member of staff."""
+  STAFF
+  """Facilities staff, who manage the rooms."""
+  FACILITIES
+}
+
+scalar RoomCode @spec(path: "scalars.room-code")
+scalar Email @spec(path: "contact-formats:scalars.email")
+
+enum RoomKind @spec(path: "entities.room.properties.kind") {
+  MEETING
+  FOCUS
+  BOARDROOM
+}
+
+enum BookingStatus @spec(path: "entities.booking.lifecycles.status") {
+  HELD
+  CONFIRMED
+  CANCELLED
+}
+
+type Room @spec(path: "entities.room") {
+  id: ID!
+  code: RoomCode!
+  name: String!
+  kind: RoomKind!
+  capacity: Int
+  contact: Email
+}
+
+type Booking @spec(path: "entities.booking") {
+  id: ID!
+  room: Room!
+  start: DateTime!
+  end: DateTime!
+  holder: String
+  status: BookingStatus!
+}
+
+type RoomPage {
+  items: [Room!]!
+  next: Cursor
+}
+
+type BookingPage {
+  items: [Booking!]!
+  next: Cursor
+}
+
+type Query {
+  """
+  Finds the rooms free for a slot: those with no held or confirmed
+  booking overlapping it.
+  """
+  freeRooms(
+    start: DateTime!
+    end: DateTime!
+    first: Int
+    after: Cursor
+  ): RoomPage!
+    @allow(roles: [STAFF, FACILITIES])
+    @spec(
+      applies: ["entities.room.definitions.free"]
+      serves: ["room-booking:requirements.view.free-rooms"]
+    )
+
+  """
+  Lists a room's bookings for one day with their statuses: all of
+  them, or only those in the status asked for.
+  """
+  bookings(
+    room: RoomCode!
+    day: Date!
+    status: BookingStatus
+    first: Int
+    after: Cursor
+  ): BookingPage!
+    @allow(roles: [STAFF, FACILITIES])
+    @spec(
+      serves: [
+        "room-booking:requirements.view.day-plan"
+        "room-booking:requirements.integrations.hold-then-plan"
+      ]
+    )
+}
+
+type Mutation {
+  """
+  Adds a room to the list. Its code must be one no other room has.
+  """
+  addRoom(input: AddRoomInput!): AddRoomPayload!
+    @effect(kind: WRITE)
+    @allow(roles: [FACILITIES])
+    @spec(
+      creates: ["entities.room"]
+      enforces: ["entities.room.identity"]
+      serves: [
+        "room-booking:requirements.rooms.manage"
+        "room-booking:requirements.rooms.unique-code"
+      ]
+    )
+
+  """
+  Removes a room and the bookings it had. Refused while a held or
+  confirmed booking of it hasn't started.
+  """
+  removeRoom(code: RoomCode!): RemoveRoomPayload!
+    @effect(kind: DESTRUCTIVE)
+    @allow(roles: [FACILITIES])
+    @spec(
+      removes: ["entities.room"]
+      requires: ["entities.room.rules.no-open-bookings-when-removed"]
+      serves: ["room-booking:requirements.rooms.manage"]
+    )
+
+  """
+  Holds a room for a slot. The hold shows in that day's plan until
+  it is cancelled.
+  """
+  holdRoom(
+    room: RoomCode!
+    start: DateTime!
+    end: DateTime!
+  ): HoldRoomPayload!
+    @effect(kind: WRITE)
+    @allow(roles: [STAFF])
+    @spec(
+      creates: ["entities.booking"]
+      enforces: [
+        "entities.booking.rules.no-overlap"
+        "entities.booking.rules.valid-slot"
+      ]
+      serves: [
+        "room-booking:requirements.book.no-overlap"
+        "room-booking:requirements.book.valid-slot"
+        "room-booking:requirements.integrations.hold-then-plan"
+      ]
+    )
+
+  """
+  Confirms a held booking, turning the hold into a firm booking.
+  """
+  confirmBooking(id: ID!): ConfirmBookingPayload!
+    @effect(kind: WRITE)
+    @allow(roles: [STAFF])
+    @spec(
+      performs: [
+        "entities.booking.lifecycles.status.transitions.confirm"
+      ]
+      serves: ["room-booking:requirements.book.confirm"]
+    )
+
+  """
+  Cancels a held or confirmed booking before it starts. The slot is
+  free again.
+  """
+  cancelBooking(id: ID!): CancelBookingPayload!
+    @effect(kind: DESTRUCTIVE)
+    @allow(roles: [STAFF])
+    @spec(
+      performs: [
+        "entities.booking.lifecycles.status.transitions.cancel"
+      ]
+      requires: ["entities.booking.rules.not-started"]
+      serves: ["room-booking:requirements.cancel.until-start"]
+    )
+}
+
+input AddRoomInput {
+  code: RoomCode!
+  name: String!
+  kind: RoomKind!
+  capacity: Int
+  contact: Email
+}
+
+type AddRoomPayload {
+  room: Room
+  errors: [AddRoomError!]!
+}
+
+union AddRoomError = CodeTaken
+
+type RemoveRoomPayload {
+  id: ID
+  errors: [RemoveRoomError!]!
+}
+
+union RemoveRoomError = NotFound | HasOpenBookings
+
+type HoldRoomPayload {
+  booking: Booking
+  errors: [HoldRoomError!]!
+}
+
+union HoldRoomError = NotFound | SlotTaken | InvalidSlot
+
+type ConfirmBookingPayload {
+  booking: Booking
+  errors: [ConfirmBookingError!]!
+}
+
+union ConfirmBookingError = NotFound | NotHeld
+
+type CancelBookingPayload {
+  booking: Booking
+  errors: [CancelBookingError!]!
+}
+
+union CancelBookingError = NotFound | NotOpen | AlreadyStarted
+
+"""Another room already has this code."""
+type CodeTaken implements Error
+  @spec(path: "entities.room.identity") {
+  message: String!
+  room: Room!
+}
+
+"""The room has a held or confirmed booking that hasn't started."""
+type HasOpenBookings implements Error
+  @spec(path: "entities.room.rules.no-open-bookings-when-removed") {
+  message: String!
+}
+
+"""A held or confirmed booking of the room overlaps the slot."""
+type SlotTaken implements Error
+  @spec(path: "entities.booking.rules.no-overlap") {
+  message: String!
+  booking: Booking!
+}
+
+"""The slot ends before it starts, or lasts more than a day."""
+type InvalidSlot implements Error
+  @spec(path: "entities.booking.rules.valid-slot") {
+  message: String!
+}
+
+"""The booking isn't held: it is already confirmed or cancelled."""
+type NotHeld implements Error
+  @spec(
+    path: "entities.booking.lifecycles.status.transitions.confirm"
+  ) {
+  message: String!
+}
+
+"""The booking is already cancelled."""
+type NotOpen implements Error
+  @spec(
+    path: "entities.booking.lifecycles.status.transitions.cancel"
+  ) {
+  message: String!
+}
+
+"""The booking has started, so nothing can change it."""
+type AlreadyStarted implements Error
+  @spec(path: "entities.booking.rules.not-started") {
+  message: String!
+}

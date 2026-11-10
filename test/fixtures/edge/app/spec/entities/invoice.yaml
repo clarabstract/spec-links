@@ -1,0 +1,16 @@
+entity: invoice
+properties:
+  order:
+    type: order
+  full:
+    type: entities.order
+  isbn:
+    type: shared-formats:scalars.isbn
+rules:
+  matches-order:
+    rule: >
+      An invoice bills what {properties.order} holds and nothing
+      from {rules.paid-once}.
+lines:
+  - label: first
+    amount: label

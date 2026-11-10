@@ -1,0 +1,73 @@
+format: https://github.com/clarabstract/spec-service/blob/v0.2/references/entity-spec-format.md
+entity: booking
+description: >
+  A room held for one span of time by a member of staff. A booking
+  is made as a hold and confirmed later; until it starts, it can be
+  cancelled.
+identity:
+  same-when: >
+    Two bookings are the same when they are of the same room and
+    start at the same moment: room 3.14 at 10:00 on 7 Nov is one
+    booking, however many times it is asked for.
+  referred-to-as: >
+    By room and start: "Room 3.14 at 10:00 on 7 Nov".
+belongs-to: entities.room
+properties:
+  room:
+    type: entities.room
+    required: true
+    on-delete: deleted with the room
+  start:
+    type: date-time
+    required: true
+    changeable: false
+  end:
+    type: date-time
+    required: true
+    changeable: false
+  holder:
+    meaning: the caller who made the booking
+    type: short-text
+    set-by: system
+  status:
+    type: lifecycles.status
+lifecycles:
+  status:
+    starts: states.held
+    states:
+      held: made, not yet confirmed; the slot is taken
+      confirmed: the holder has confirmed they will use the room
+      cancelled: given up before it started; the slot is free
+    transitions:
+      confirm:
+        from: states.held
+        to: states.confirmed
+        serves: [room-booking:requirements.book.confirm]
+      cancel:
+        from: [states.held, states.confirmed]
+        to: states.cancelled
+        serves: [room-booking:requirements.cancel.until-start]
+    final: [states.cancelled]
+    serves: [room-booking:requirements.book.confirm]
+rules:
+  no-overlap:
+    rule: >
+      No two held or confirmed bookings of the same
+      {properties.room} overlap in time, even when made at the same
+      moment.
+    scope: records
+    holds: room 3.14, 10:00 to 11:00 and 11:00 to 12:00
+    breaks: room 3.14, 10:00 to 11:00 and 10:30 to 11:30
+    serves:
+      - room-booking:requirements.book.no-overlap
+      - room-booking:requirements.integrations.hold-then-plan
+  valid-slot:
+    rule: >
+      A booking's {properties.end} is after its {properties.start},
+      and the two are at most a day apart.
+    holds: 10:00 to 11:00
+    breaks: 11:00 to 10:00; 10:00 on Monday to 11:00 on Tuesday
+    serves: [room-booking:requirements.book.valid-slot]
+  not-started:
+    rule: A booking can change only before its {properties.start}.
+    serves: [room-booking:requirements.cancel.until-start]

@@ -1,0 +1,8 @@
+format: example
+solution: plans
+components:
+  api:
+    kind: service
+connections:
+  ui-calls-api:
+    to: components.api

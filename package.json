@@ -1,0 +1,25 @@
+{
+  "name": "spec-links",
+  "version": "0.1.0",
+  "description": "Resolves a spec reference to the exact file and line it names, and finds what references a spec item.",
+  "type": "module",
+  "license": "MIT",
+  "exports": "./src/index.mjs",
+  "bin": {
+    "spec-links": "bin/spec-links.mjs"
+  },
+  "files": [
+    "src",
+    "bin"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "dependencies": {
+    "graphql": "^16.9",
+    "yaml": "^2.6"
+  }
+}

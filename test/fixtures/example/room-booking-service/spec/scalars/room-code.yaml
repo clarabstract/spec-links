@@ -1,0 +1,12 @@
+format: https://github.com/clarabstract/spec-service/blob/v0.2/references/entity-spec-format.md
+scalar: room-code
+base: short-text
+description: >
+  A room's code as facilities label it: the floor number and the
+  room number on that floor, separated by a dot.
+rules:
+  floor-dot-room:
+    rule: A code is a floor number, a dot and a room number.
+    holds: "3.14"
+    breaks: "314"
+    serves: [room-booking:requirements.rooms.code-format]
